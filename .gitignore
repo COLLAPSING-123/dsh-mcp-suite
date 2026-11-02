@@ -1,0 +1,13 @@
+# 密钥与运行时产物
+.env
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 运行时
+logs/
+dist/

@@ -1,0 +1,12 @@
+{
+  "name": "windows-local-ai-agent",
+  "version": "0.1.0",
+  "api_style": "OpenAI-compatible Chat Completions",
+  "targets": [
+    "Windows PowerShell",
+    "WSL Ubuntu",
+    "Ubuntu VM over SSH",
+    "visible Windows desktop"
+  ],
+  "approval": "Every tool call requires local confirmation"
+}

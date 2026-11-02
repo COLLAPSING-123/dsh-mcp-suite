@@ -1,0 +1,61 @@
+# ============================================================================
+# DSH MCP 配置片段 —— 复制到 C:\Users\<你>\.dsh-beta\profiles\desktop\cordis.patch.yml
+# ============================================================================
+# 规则（踩过的坑）：
+#   1. 这个文件是「补丁层」：带 id 的条目只能**覆盖已存在的** id；
+#      新增插件必须写成 `- insert:` 包一层，否则 DSH 启动日志只报
+#      `patch: entry "xxx" not found` 然后静默跳过。
+#   2. 先全部替换掉 <尖括号> 占位符，再重启 DSH Desktop。
+#   3. YAML 用单引号包 Windows 路径，反斜杠不用转义。
+#   4. 每加一个 server 都必须有唯一的 serverName（这里 cua/docs/shell/git）。
+# ============================================================================
+
+- insert:
+    # ---------------------------------------------------------------- 桌面控制
+    # 重要：command 必须是**工作区目录之外**的 python.exe。
+    # 工作区内的 exe 会被 DSH 降为 Low 完整性 → SetCursorPos/SendInput 被静默丢弃，
+    # 表现是"截图正常但点不动"。
+    - id: mcp-cua
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: cua
+        transport: stdio
+        command: '<CUA_VENV>\Scripts\python.exe'
+        args: [ '-m', 'agent.mcp_server' ]
+        cwd: '<PROJECT_DIR>'
+        toolCallTimeoutMs: 240000
+        env:
+          CUA_CONFIRM: chat        # chat=对话里确认；dialog=弹出窗口（Low IL 下不可靠）
+
+    # ------------------------------------------------------------ 文档只读
+    - id: mcp-docs
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: docs
+        transport: stdio
+        command: '<BASE_PY>'
+        args: [ '<SUITE_DIR>\servers\server.py', '--profile', 'docs' ]
+        cwd: '<SUITE_DIR>'
+        toolCallTimeoutMs: 120000
+
+    # ------------------------------------------------------------ 命令执行
+    - id: mcp-shell
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: shell
+        transport: stdio
+        command: '<BASE_PY>'
+        args: [ '<SUITE_DIR>\servers\server.py', '--profile', 'shell' ]
+        cwd: '<SUITE_DIR>'
+        toolCallTimeoutMs: 300000
+
+    # ------------------------------------------------------------ git 只读
+    - id: mcp-git
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: git
+        transport: stdio
+        command: '<BASE_PY>'
+        args: [ '<SUITE_DIR>\servers\server.py', '--profile', 'git' ]
+        cwd: '<SUITE_DIR>'
+        toolCallTimeoutMs: 120000

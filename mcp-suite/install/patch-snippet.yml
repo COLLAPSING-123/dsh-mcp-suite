@@ -1,0 +1,29 @@
+# --- local MCP suite: docs / shell / git (added 2026-10-30; delete this block to roll back) ---
+- insert:
+    - id: mcp-docs
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: docs
+        transport: stdio
+        command: 'C:\Users\<user>\AppData\Local\Programs\Python\Python313\python.exe'
+        args: [ 'C:\Users\<user>\Documents\deepseek-harness\default-workspace\projects\mcp-suite\servers\server.py', '--profile', 'docs' ]
+        cwd: 'C:\Users\<user>\Documents\deepseek-harness\default-workspace\projects\mcp-suite'
+        toolCallTimeoutMs: 120000
+    - id: mcp-shell
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: shell
+        transport: stdio
+        command: 'C:\Users\<user>\AppData\Local\Programs\Python\Python313\python.exe'
+        args: [ 'C:\Users\<user>\Documents\deepseek-harness\default-workspace\projects\mcp-suite\servers\server.py', '--profile', 'shell' ]
+        cwd: 'C:\Users\<user>\Documents\deepseek-harness\default-workspace\projects\mcp-suite'
+        toolCallTimeoutMs: 300000
+    - id: mcp-git
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: git
+        transport: stdio
+        command: 'C:\Users\<user>\AppData\Local\Programs\Python\Python313\python.exe'
+        args: [ 'C:\Users\<user>\Documents\deepseek-harness\default-workspace\projects\mcp-suite\servers\server.py', '--profile', 'git' ]
+        cwd: 'C:\Users\<user>\Documents\deepseek-harness\default-workspace\projects\mcp-suite'
+        toolCallTimeoutMs: 120000
