@@ -1,6 +1,6 @@
 # `cua` —— 桌面控制
 
-**服务名**：`cua`　**工具数**：9　**可写，每次操作需你明确同意**
+**服务名**：`cua`　**工具数**：11　**可写，每次操作需你明确同意**
 
 > 这个 MCP 不是这次配的，是之前就有的（`cordis.patch.yml` 里的 `mcp-cua`），
 > 指向 `C:\Users\<user>\Desktop\windows_local_ai_agent`。
@@ -23,12 +23,14 @@
 
 | 工具 | 作用 | 需确认 |
 |---|---|---|
-| `screenshot` | 截取整个桌面 | 否 |
+| `screenshot` | 截取整个桌面，或传 `window` 只截某个窗口（PrintWindow，能拍 GPU 窗口） | 否 |
+| `list_windows` | 列出可见窗口（标题/坐标/尺寸/是否最小化） | 否 |
+| `focus_window` | 把标题匹配的窗口切到前台 | 否 |
 | `screen_size` | 查真实分辨率 | 否 |
 | `move` | 移动鼠标（不点击） | 否 |
 | `wait` | 等待，最多 30 秒 | 否 |
 | `click` | 在坐标点击 | **是** |
-| `type_text` | 输入文字（支持中文） | **是** |
+| `type_text` | 输入文字（中文/emoji，默认键盘事件不碰剪贴板） | **是** |
 | `press` | 按单个键（enter/esc/tab/f5…） | **是** |
 | `hotkey` | 组合键（`["ctrl","s"]`） | **是** |
 | `scroll` | 滚轮滚动 | **是** |

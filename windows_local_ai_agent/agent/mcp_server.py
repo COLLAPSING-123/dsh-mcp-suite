@@ -42,8 +42,10 @@ import pyautogui
 
 try:  # run as `python -m agent.mcp_server`
     from . import mcpcore
+    from . import win32_ops
 except ImportError:  # run as a plain script
     import mcpcore  # type: ignore[no-redef]
+    import win32_ops  # type: ignore[no-redef]
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 LOG_PATH = PROJECT_ROOT / "logs" / "mcp-cua.log"
@@ -61,7 +63,8 @@ CONFIRM_MODE = os.getenv("CUA_CONFIRM", "chat").strip().lower()
 if CONFIRM_MODE not in {"chat", "dialog"}:
     CONFIRM_MODE = "chat"
 
-STATE: dict = {"sx": 1.0, "sy": 1.0, "shot_w": 0, "shot_h": 0, "shots": 0}
+STATE: dict = {"sx": 1.0, "sy": 1.0, "shot_w": 0, "shot_h": 0, "shots": 0,
+               "origin_x": 0, "origin_y": 0}
 
 ASK = "调用前必须先在对话里说明这次动作，并等用户明确同意。"
 
@@ -120,11 +123,17 @@ def _confirm(title: str, detail: str) -> bool:
 
 
 def _to_screen(x: int, y: int) -> tuple[int, int]:
+    """Screenshot pixel -> real screen pixel.
+
+    A whole-screen shot has origin (0, 0); a `screenshot(window=...)` shot has
+    the window's top-left as origin, so window-relative coordinates land on the
+    right place even after the window moves.
+    """
     width, height = pyautogui.size()
     sx = STATE["sx"] or 1.0
     sy = STATE["sy"] or 1.0
-    px = int(round(x * sx))
-    py = int(round(y * sy))
+    px = int(round(x * sx)) + STATE.get("origin_x", 0)
+    py = int(round(y * sy)) + STATE.get("origin_y", 0)
     return max(0, min(width - 1, px)), max(0, min(height - 1, py))
 
 
@@ -149,14 +158,33 @@ def screen_size() -> dict:
 
 @server.tool(
     "screenshot",
-    "截取当前整个 Windows 桌面，返回图片和尺寸信息。无需确认。"
-    "图片已按最长边缩放到最多 1600 像素，后续坐标都用这张图的像素坐标。",
-    {"type": "object", "properties": {}, "additionalProperties": False},
+    "截取 Windows 桌面或单个窗口，返回图片和尺寸信息。无需确认。"
+    "图片按最长边缩放到最多 1600 像素；给 window 时只截该窗口"
+    "（走 PrintWindow，能拍到 GPU 加速窗口，GDI 截图对这类窗口会全黑）。",
+    {"type": "object",
+     "properties": {"window": {"type": "string",
+                               "description": "窗口标题的一部分；省略则截整个屏幕"}},
+     "additionalProperties": False},
     read_only=True,
 )
-def screenshot():
+def screenshot(window: str = ""):
     started = time.time()
-    image = pyautogui.screenshot()
+    origin = (0, 0)
+    if window:
+        hwnd = win32_ops.find_window(window)
+        if not hwnd:
+            return f"找不到标题包含「{window}」的可见窗口。先用 list_windows 看有哪些。"
+        try:
+            image = win32_ops.capture_window(hwnd)
+        except (ValueError, RuntimeError) as exc:
+            return f"截取「{window}」失败：{exc}"
+        rect = win32_ops.window_rect(hwnd)
+        origin = (rect["x"], rect["y"])
+        source = f"窗口「{win32_ops.window_title(hwnd)}」"
+    else:
+        image = pyautogui.screenshot()
+        source = "整个屏幕"
+
     width, height = image.size
     scale = min(1.0, MAX_EDGE / max(width, height))
     if scale < 1.0:
@@ -170,15 +198,19 @@ def screenshot():
         shot_w=image.width,
         shot_h=image.height,
         shots=STATE["shots"] + 1,
+        origin_x=origin[0],
+        origin_y=origin[1],
     )
-    logging.info("screenshot %sx%s -> %sx%s in %.2fs",
-                 width, height, image.width, image.height, time.time() - started)
+    logging.info("screenshot %s %sx%s -> %sx%s in %.2fs",
+                 source, width, height, image.width, image.height, time.time() - started)
 
     note = (
-        f"截图 {image.width}x{image.height}（真实屏幕 {width}x{height}）。"
+        f"{source}：截图 {image.width}x{image.height}（原始 {width}x{height}）。"
         f"坐标请使用这张图的像素坐标（0..{image.width - 1}, 0..{image.height - 1}），"
         "服务器会自动换算到真实屏幕。"
     )
+    if origin != (0, 0):
+        note += f"该窗口在屏幕上的左上角是 ({origin[0]}, {origin[1]})。"
     return [
         {
             "type": "image",
@@ -187,6 +219,49 @@ def screenshot():
         },
         note,
     ]
+
+
+@server.tool("list_windows",
+             "列出当前可见的顶层窗口（标题 + 屏幕坐标 + 尺寸），按前后顺序。无需确认。",
+             {"type": "object", "properties": {}, "additionalProperties": False},
+             read_only=True)
+def list_windows() -> str:
+    windows = win32_ops.list_windows()
+    if not windows:
+        return "没有可见窗口。"
+    lines = [f"共 {len(windows)} 个窗口（从前到后）："]
+    for i, win in enumerate(windows[:40], 1):
+        tag = "  [最小化]" if win["minimized"] else ""
+        lines.append(
+            f"{i}. {win['title']}{tag}  [{win['width']}x{win['height']} @ {win['x']},{win['y']}]"
+        )
+    if len(windows) > 40:
+        lines.append(f"...还有 {len(windows) - 40} 个未列出")
+    return "\n".join(lines)
+
+
+@server.tool("focus_window",
+             "把标题包含 window 的窗口切到前台（会自动还原最小化）。无需确认。"
+             "Windows 只允许前台进程改变前台窗口，所以常会失败；"
+             "allow_click=true 时会额外在该窗口内点一下鼠标来激活它——那是一次真实点击。",
+             {"type": "object",
+              "properties": {"window": {"type": "string"},
+                             "allow_click": {"type": "boolean"}},
+              "required": ["window"], "additionalProperties": False},
+             read_only=True)
+def focus_window(window: str, allow_click: bool = False) -> str:
+    hwnd = win32_ops.find_window(window)
+    if not hwnd:
+        return f"找不到标题包含「{window}」的可见窗口。"
+    title = win32_ops.window_title(hwnd)
+    ok = win32_ops.focus_window(hwnd, allow_click=allow_click)
+    logging.info("focus_window %s -> %s (allow_click=%s)", title, ok, allow_click)
+    if ok:
+        return f"已切到「{title}」。"
+    return (
+        f"切到「{title}」失败：Windows 的前台锁只允许前台进程改变前台窗口。"
+        "可以让用户点一下该窗口，或用 allow_click=true 让我在窗口内点一下（真实点击）。"
+    )
 
 
 @server.tool("move", "把鼠标移动到截图坐标 (x, y)。不点击，无需确认。",
@@ -226,25 +301,49 @@ def click(x: int, y: int, button: str = "left", clicks: int = 1) -> str:
 
 @server.tool(
     "type_text",
-    f"在当前焦点窗口输入文字（支持中文，走剪贴板粘贴）。{ASK}",
-    {"type": "object", "properties": {"text": {"type": "string"}},
+    f"在当前焦点窗口输入文字（支持中文与 emoji）。{ASK}"
+    "默认用键盘事件逐字输入，不碰剪贴板；method=paste 时才走剪贴板"
+    "（会先保存、校验、结束后恢复原剪贴板）。",
+    {"type": "object",
+     "properties": {"text": {"type": "string"},
+                    "method": {"type": "string", "enum": ["auto", "keys", "paste"]}},
      "required": ["text"], "additionalProperties": False},
     read_only=False,
 )
-def type_text(text: str) -> str:
+def type_text(text: str, method: str = "auto") -> str:
     if not text:
         return "text 为空，没有执行。"
     if len(text) > 4000:
         return "text 超过 4000 字符，请分批输入。"
     preview = text[:80] + ("…" if len(text) > 80 else "")
-    if not _confirm("输入文字", f"共 {len(text)} 字符，开头：\n{preview}"):
+    if not _confirm("输入文字", f"共 {len(text)} 字符（{method}），开头：\n{preview}"):
         return _deny("输入文字")
-    pyperclip = __import__("pyperclip")
-    pyperclip.copy(text)
-    time.sleep(0.1)
-    pyautogui.hotkey("ctrl", "v")
-    logging.info("type_text %s chars", len(text))
-    return f"已粘贴 {len(text)} 个字符到当前焦点窗口。"
+
+    if method == "auto":
+        method = "keys"
+
+    if method == "paste":
+        # Save -> write -> verify -> paste -> restore. If the clipboard write did
+        # not land, pasting would insert whatever the user had copied instead.
+        original = win32_ops.clipboard_get_text()
+        had_text = win32_ops.clipboard_has_text()
+        if not win32_ops.clipboard_set_text(text):
+            return "剪贴板写入失败，已放弃粘贴（避免把你原有的剪贴板内容贴进去）。"
+        try:
+            pyautogui.hotkey("ctrl", "v")
+            time.sleep(0.25)
+        finally:
+            if had_text and original is not None:
+                win32_ops.clipboard_set_text(original)
+            elif not had_text:
+                win32_ops.clipboard_set_text("")
+        logging.info("type_text %s chars via paste (clipboard restored)", len(text))
+        suffix = "" if had_text else "（原剪贴板不是文本，已被清空）"
+        return f"已粘贴 {len(text)} 个字符到当前焦点窗口。{suffix}"
+
+    sent = win32_ops.type_unicode(text)
+    logging.info("type_text %s chars via unicode keys (%s units)", len(text), sent)
+    return f"已逐字输入 {len(text)} 个字符（不占用剪贴板）。"
 
 
 @server.tool(

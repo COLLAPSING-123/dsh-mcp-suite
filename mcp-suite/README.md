@@ -35,7 +35,7 @@ projects/mcp-suite/
 │   ├── docs-mcp.md        # 4 个文档工具
 │   ├── shell-mcp.md       # 4 个命令工具
 │   ├── git-mcp.md         # 6 个 git 工具
-│   ├── cua-mcp.md         # 9 个桌面控制工具（已有，非本次新增）
+│   ├── cua-mcp.md         # 11 个桌面控制工具
 │   └── troubleshooting.md # 排障
 ├── tests/
 │   ├── bug_hunt.py        # 50 用例回归测试

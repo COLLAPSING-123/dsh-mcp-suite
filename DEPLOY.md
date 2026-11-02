@@ -15,7 +15,7 @@ dsh-mcp-suite-<date>.zip
 ├── install/
 │   └── patch-snippet.yml           ← 直接可用的 DSH 配置模板（含 4 个 server）
 ├── windows_local_ai_agent/         ← 桌面控制项目（cua）
-│   ├── agent/mcp_server.py         ← 9 个桌面工具（零第三方 SDK）
+│   ├── agent/mcp_server.py         ← 11 个桌面工具（零第三方 SDK）
 │   ├── agent/mcpcore.py            ← 手写 MCP stdio 协议层，无依赖
 │   ├── agent/main.py               ← 另一套：自带 LLM 循环的旧版 agent（可选）
 │   ├── scripts/mcp_probe.py        ← 不依赖 DSH 的协议自检脚本
@@ -104,7 +104,7 @@ integrity: Medium
 screen: Size(width=..., height=...)
 screenshot: (..., ...)
 cursor: Point(x=..., y=...) -> Point(x=40, y=60) OK      ← 必须是 OK
-click / hotkey / move / press / screen_size / screenshot / scroll / type_text / wait  (共 9 个)
+click / focus_window / hotkey / list_windows / move / press / screen_size / screenshot / scroll / type_text / wait  (共 11 个)
 ```
 
 **只要看到 `integrity: Low` 或 `cursor: ... BLOCKED`，立刻停**，回到第 3 节检查 exe 位置。
@@ -116,7 +116,7 @@ click / hotkey / move / press / screen_size / screenshot / scroll / type_text / 
 & 'C:\Users\<你>\.mcp\cua-venv\Scripts\python.exe' scripts\mcp_probe.py
 ```
 
-期望 `protocol: 2025-11-25`（或更新）、9 个工具、`screenshot: isError=False -> ['image(...)', 'text(...)']`。
+期望 `protocol: 2025-11-25`（或更新）、11 个工具、`screenshot: isError=False -> ['image(...)', 'text(...)']`。
 
 ---
 
@@ -160,7 +160,7 @@ $srv = 'C:\Users\<你>\Documents\deepseek-harness\default-workspace\projects\mcp
 
 ## 8. 验证工具真的挂上了
 
-重启后，在对话里说「截个图看看」，或直接看工具列表里有没有 `mcp__cua__screenshot` 等 9 个。
+重启后，在对话里说「截个图看看」，或直接看工具列表里有没有 `mcp__cua__screenshot` 等 11 个。
 
 命令行侧的证据（更可靠）：
 
